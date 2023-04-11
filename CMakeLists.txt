@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(Image_Composition_OpenMP)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # Where to find CMake modules and OpenCV
 set(OpenCV_DIR C:/Development/OpenCV/build)

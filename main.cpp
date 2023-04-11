@@ -1,87 +1,113 @@
 #include <iostream>
+#include <filesystem>
+#include <sstream>
 
 #include <opencv2/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/objdetect/objdetect.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+namespace fs = std::filesystem;
 
-void dataAugmentation(cv::Mat image, int transformations)
+
+int dataAugmentation(cv::Mat& foreground, std::vector<cv::Mat>& backgrounds, int transformations)
 {
+	std::srand(std::time(nullptr));
+	std::time_t t = std::time(nullptr);
+	std::tm* now = std::localtime(&t);
+
+	std::stringstream folderName;
+	folderName <<
+			   (now->tm_year + 1900) << '-' <<
+			   (now->tm_mon + 1) << '-' <<
+			   now->tm_mday << '-' <<
+			   now->tm_hour << '-' <<
+			   now->tm_min << '-' <<
+			   now->tm_sec;
+
+	std::stringstream output_folder;
+	output_folder << "../output/" << folderName.str() ;
+	fs::create_directories(output_folder.str());
+
 	for (int count = 0; count < transformations; ++count) {
-		cv::Mat copy = image.clone();
+		int index = (int) (std::rand() % backgrounds.size());
+		cv::Mat background = backgrounds.at(index).clone();
+		foreground = foreground.clone();
 
-		std::cout << "copy.rows: " << copy.rows << std::endl;
-		std::cout << "copy.cols: " << copy.cols << std::endl;
+		if (background.rows < foreground.rows ||
+			background.cols < foreground.cols)
+		{
+			std::cout << "ERROR: the foreground exceeds the background dimensions" << std::endl;
+			return 1;
+		}
 
-		for (int i = 0; i < copy.rows; ++i) {
-			for (int j = 0; j < copy.cols; ++j) {
-				cv::Vec4b& pixel = image.at<cv::Vec4b>(i, j);
-				pixel[0] = (pixel[0] + 255) / 2;
-				pixel[1] = (pixel[1] + 255) / 2;
-				pixel[2] = (pixel[2] + 255) / 2;
-				pixel[3] = 128;
+		int row;
+		if (background.rows - foreground.rows == 0) { row = 0; }
+		else { row = (int) (std::rand() % (background.rows - foreground.rows)); }
 
-				/*
-				std::cout << "pixel[0]: " << pixel[0] << std::endl;
-				std::cout << "pixel[1]: " << pixel[1] << std::endl;
-				std::cout << "pixel[2]: " << pixel[2] << std::endl;
-				std::cout << "pixel[3]: " << pixel[3] << std::endl;*/
+		int col;
+		if (background.cols - foreground.cols == 0) { col = 0; }
+		else { col = (int) (std::rand() % (background.cols - foreground.cols)); }
+
+		int alpha = 64 + rand() % 192;
+		float alphaCorrectionFactor = (float) alpha / 255;
+		float betaCorrectionFactor = 1 - alphaCorrectionFactor;
+
+
+		for (int i = 0; i < foreground.rows; ++i)
+		{
+			for (int j = 0; j < foreground.cols; ++j)
+			{
+				cv::Vec4b& f_pixel = foreground.at<cv::Vec4b>(i, j);
+				cv::Vec4b& b_pixel = background.at<cv::Vec4b>(row + i, col + j);
+				float b_alpha = (float) f_pixel[3] / 255;
+				b_pixel[0] = (unsigned char) ((float) b_pixel[0] * betaCorrectionFactor + (float) f_pixel[0] * alphaCorrectionFactor * b_alpha);
+				b_pixel[1] = (unsigned char) ((float) b_pixel[1] * betaCorrectionFactor + (float) f_pixel[1] * alphaCorrectionFactor * b_alpha);
+				b_pixel[2] = (unsigned char) ((float) b_pixel[2] * betaCorrectionFactor + (float) f_pixel[2] * alphaCorrectionFactor * b_alpha);
 			}
 		}
 
-		cv::imwrite("../output/out.png", image);
-		cv::imshow("Transparency", image);
-		cv::waitKey(0);
+		std::stringstream output_path;
+		output_path << output_folder.str() << "/out_" << std::to_string(count) << ".png";
+		cv::imwrite(output_path.str(), background);
 	}
+	return 0;
 }
 
 int main()
 {
-	double alpha = 0.5; double beta;
+	std::string background_path = "../input/background";
+	std::string foreground_path = "../input/foreground";
 
-	cv::Mat src1, src2, dst;
-
-	std::string src1_path = "../input/quokka.png";
-	std::string src2_path = "../input/quokka2.png";
-
-	std::cout << " Simple Linear Blender " << std::endl;
-	std::cout << "-----------------------" << std::endl;
-	std::cout << "* Enter alpha [0.0-1.0]: ";
-	//std::cin >> input;
-
-	// We use the alpha provided by the user if it is between 0 and 1
-	/*if( input >= 0 && input <= 1 )
-	{ alpha = input; }*/
-
-	src1 = cv::imread(src1_path);
-	src2 = cv::imread(src2_path);
-
-	if( src1.empty() ) { std::cout << "Error loading src1" << std::endl; return EXIT_FAILURE; }
-	if( src2.empty() ) { std::cout << "Error loading src2" << std::endl; return EXIT_FAILURE; }
-
-	beta = ( 1.0 - alpha );
-	addWeighted(src1, alpha, src2, beta, 0.0, dst);
-
-	cv::imshow( "Linear Blend", dst);
-	cv::imwrite("../output/out.png", dst);
-
-	cv::waitKey(0);
-
-	/*std::string image_path = "../input/quokka.png";
-	cv::Mat image = cv::imread(image_path);
-
-	cv::Mat image_bgra;
-	cvtColor(image, image_bgra, cv::COLOR_BGR2BGRA);
-
-	if (image.empty())
+	// Read foreground
+	const auto& f_entry = begin(fs::directory_iterator(foreground_path));
+	cv::Mat foreground = cv::imread(f_entry->path().string(), cv::IMREAD_UNCHANGED);
+	if (foreground.empty())
 	{
-		std::cout << "Could not read the image: " << image_path << std::endl;
+		std::cout << "ERROR: foreground not found at: " << f_entry->path().string() << std::endl;
 		return 1;
 	}
-	cv::imshow("Original", image);
+	cvtColor(foreground, foreground, cv::COLOR_BGR2BGRA);
 
-	dataAugmentation(image_bgra, 1);*/
+	// Read background
+	std::vector<cv::Mat> backgrounds;
+	for (const auto & b_entry : fs::directory_iterator(background_path)) {
+		cv::Mat background = cv::imread(b_entry.path().string(), cv::IMREAD_UNCHANGED);
+		if (!background.empty()) {
+			cvtColor(background, background, cv::COLOR_BGR2BGRA);
+			backgrounds.push_back(background);
+		}
+	}
+	if (backgrounds.size() == 0)
+	{
+		std::cout << "ERROR: no backgrounds found at: " << background_path << std::endl;
+		return 1;
+	}
+
+	cv::imshow("Foreground", foreground);
+	cv::waitKey(0);
+
+	dataAugmentation(foreground, backgrounds, 5);
 
     return 0;
 }
