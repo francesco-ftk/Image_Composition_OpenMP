@@ -61,7 +61,7 @@ int dataAugmentation(cv::Mat& foreground, std::vector<cv::Mat>& backgrounds, int
 				cv::Vec4b& f_pixel = foreground.at<cv::Vec4b>(i, j);
 				cv::Vec4b& b_pixel = background.at<cv::Vec4b>(row + i, col + j);
 				float f_alpha = (float) f_pixel[3] / 255;
-                if(f_alpha != 0.0){
+                if(f_alpha > 0.9){
                     b_pixel[0] = (unsigned char) ((float) b_pixel[0] * betaCorrectionFactor + (float) f_pixel[0] * alphaCorrectionFactor * f_alpha);
 				    b_pixel[1] = (unsigned char) ((float) b_pixel[1] * betaCorrectionFactor + (float) f_pixel[1] * alphaCorrectionFactor * f_alpha);
 				    b_pixel[2] = (unsigned char) ((float) b_pixel[2] * betaCorrectionFactor + (float) f_pixel[2] * alphaCorrectionFactor * f_alpha);
