@@ -8,6 +8,7 @@ set(OpenCV_DIR C:/Development/OpenCV/build)
 #set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 include_directories(${OpenCV_INCLUDE_DIRS})
 find_package(OpenCV REQUIRED)
+find_package(OpenMP REQUIRED)
 
 add_executable(Image_Composition_OpenMP main.cpp)
 
@@ -15,4 +16,4 @@ add_executable(Image_Composition_OpenMP main.cpp)
 set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui opencv_imgcodecs)
 
 # linking
-target_link_libraries(Image_Composition_OpenMP ${OpenCV_LIBS})
+target_link_libraries(Image_Composition_OpenMP ${OpenCV_LIBS} OpenMP::OpenMP_CXX)
